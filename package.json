@@ -1,0 +1,15 @@
+{
+  "name": "mtg-cyberscry",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "npm run dev --workspace=@cyberscry/web",
+    "build": "npm run build --workspace=@cyberscry/web",
+    "lint": "npm run lint --workspace=@cyberscry/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:migrate": "npm run migrate --workspace=@cyberscry/database",
+    "db:seed": "npm run seed --workspace=@cyberscry/database",
+    "db:setup": "npm run db:migrate && npm run db:seed"
+  },
+  "engines": { "node": ">=22" }
+}
