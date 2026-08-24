@@ -1,5 +1,7 @@
 # Cyberscry
 
+Work in progress!
+
 Cyberscry is a self-hosted Magic: The Gathering collection manager and deck-building workspace. It tracks owned card printings in PostgreSQL, builds and validates Commander decks, estimates the cost of missing cards, and uses Scryfall as its card catalog.
 
 AI-assisted Commander construction is available through the OpenAI Responses API. When OpenAI is not configured or temporarily unavailable, Cyberscry falls back to its local Scryfall-based builder.
