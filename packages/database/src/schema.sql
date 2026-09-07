@@ -24,6 +24,12 @@ CREATE TABLE IF NOT EXISTS cards (
 
 CREATE INDEX IF NOT EXISTS cards_name_search_idx ON cards USING gin (to_tsvector('english', name));
 
+CREATE TABLE IF NOT EXISTS external_api_cache (
+  cache_key text PRIMARY KEY,
+  payload jsonb NOT NULL,
+  fetched_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS collection_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   card_id uuid NOT NULL REFERENCES cards(id) ON DELETE CASCADE,

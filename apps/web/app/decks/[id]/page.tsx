@@ -27,6 +27,7 @@ import { DeckCardSearch } from "@/components/deck-card-search";
 import { DeckLegalitySummary } from "@/components/deck-legality-summary";
 import { validateCommanderDeck } from "@/lib/deck-legality";
 import { deckCardQuantityLimit } from "@/lib/deck-quantity";
+import { TcgplayerKickbackNotice } from "@/components/tcgplayer-kickback-notice";
 
 export const dynamic = "force-dynamic";
 
@@ -310,6 +311,7 @@ export default async function DeckPage({
               ? `Current estimated checkout: ${money(cost)}. Prices use the latest stored market snapshot.`
               : "Every listed card is available in your collection."}
           </p>
+          {missing > 0 && <TcgplayerKickbackNotice />}
         </div>
       </section>
     </div>

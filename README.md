@@ -33,6 +33,7 @@ AI-assisted Commander construction is available through the OpenAI Responses API
 - PostgreSQL
 - npm workspaces
 - Scryfall API for card metadata, legality, prices, artwork, and catalog searches
+- TCGplayer External Kickbacks API for promotional affiliate status
 - OpenAI Responses API for optional AI-assisted Commander construction
 - Mana font for Magic mana symbols
 - Lucide icons
@@ -205,6 +206,14 @@ Scryfall is the application's single MTG catalog source. It provides card search
 
 Card artwork is loaded from stored Scryfall image URLs. Commander artwork is used for Commander deck previews when available, with another deck card used as a fallback.
 
+### TCGplayer kickbacks
+
+Cyberscry polls TCGplayer's External Kickbacks API from the server and caches the response in PostgreSQL for one hour. The deck purchase plan displays the current Magic/Singles kickback when one is active, along with this disclosure:
+
+> Affiliate link: Cyberscry may earn a commission if you purchase through TCGplayer links. Your price is unchanged.
+
+The endpoint is public and does not require an API key. Affiliate links themselves still require enrollment in TCGplayer's affiliate program through Impact. See the [TCGplayer External Kickbacks API documentation](https://docs.tcgplayer.com/docs/external-kickbacks-api) and [partner guidelines](https://help.tcgplayer.com/hc/en-us/articles/31411199594391-TCGplayer-Partner-Guidelines).
+
 ## Environment variables
 
 | Variable | Required | Description |
@@ -213,6 +222,7 @@ Card artwork is loaded from stored Scryfall image URLs. Commander artwork is use
 | `OPENAI_API_KEY` | No | Enables AI-assisted Commander construction |
 | `OPENAI_MODEL` | No | OpenAI model used by the builder; defaults to `gpt-5.4` |
 | `CYBERSCRY_ALLOWED_ORIGINS` | No | Additional comma-separated LAN hostnames or addresses allowed by Next.js |
+| `TCGPLAYER_KICKBACKS_URL` | No | TCGplayer kickbacks endpoint; defaults to the official External Kickbacks API URL |
 
 ## Notes
 

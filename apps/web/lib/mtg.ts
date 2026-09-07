@@ -49,15 +49,26 @@ export async function findScryfallCard(id: string): Promise<ScryfallCard> {
   return scryfallRequest(`https://api.scryfall.com/cards/${encodeURIComponent(id)}`) as Promise<ScryfallCard>;
 }
 
-export async function searchScryfallPrintings(name:string):Promise<ScryfallCard[]> {
+export async function searchScryfallPrintings(name:string, page = 1):Promise<{ cards: ScryfallCard[]; hasMore: boolean }> {
   const safeName=name.replace(/["\\]/g," ").trim().slice(0,80);
-  const url=new URL("https://api.scryfall.com/cards/search");
-  url.searchParams.set("q",`name:"${safeName}"`);
-  url.searchParams.set("order","released");
-  url.searchParams.set("dir","desc");
-  url.searchParams.set("unique","prints");
-  const result=await scryfallRequest(url.toString()) as {data:ScryfallCard[]};
-  return result.data.slice(0,24);
+  const pageSize = 16;
+  const start = (page - 1) * pageSize;
+  const cards: ScryfallCard[] = [];
+  let sourcePage = 1;
+  let hasMore = true;
+  while (cards.length < start + pageSize && hasMore) {
+    const url=new URL("https://api.scryfall.com/cards/search");
+    url.searchParams.set("q",`name:"${safeName}"`);
+    url.searchParams.set("order","released");
+    url.searchParams.set("dir","desc");
+    url.searchParams.set("unique","prints");
+    url.searchParams.set("page",String(sourcePage));
+    const result=await scryfallRequest(url.toString()) as {data:ScryfallCard[];has_more?:boolean};
+    cards.push(...result.data);
+    hasMore = Boolean(result.has_more && result.data.length);
+    sourcePage += 1;
+  }
+  return {cards:cards.slice(start,start + pageSize),hasMore:start + pageSize < cards.length || hasMore};
 }
 
 export async function searchScryfall(query: string, limit = 80): Promise<ScryfallCard[]> {
