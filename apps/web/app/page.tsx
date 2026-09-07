@@ -97,6 +97,7 @@ export default async function Dashboard() {
                     alt=""
                     fill
                     sizes="(max-width: 900px) 100vw, 33vw"
+                    loading="eager"
                     unoptimized
                   />
                 </div>

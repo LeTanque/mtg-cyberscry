@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Search } from "lucide-react";
 import { ManaCost } from "@/components/mana-cost";
 
-type Commander = {
+export type Commander = {
   id: string;
   name: string;
   manaCost: string;
@@ -12,7 +12,7 @@ type Commander = {
   colorIdentity: string[];
 };
 
-export function CommanderCombobox({ onSelectionChange }: { onSelectionChange?:(selected:boolean)=>void }) {
+export function CommanderCombobox({ onSelectionChange }: { onSelectionChange?:(selected:Commander|null)=>void }) {
   const [value, setValue] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [results, setResults] = useState<Commander[]>([]);
@@ -48,7 +48,7 @@ export function CommanderCombobox({ onSelectionChange }: { onSelectionChange?:(s
   function choose(commander: Commander) {
     setValue(commander.name);
     setSelectedId(commander.id);
-    onSelectionChange?.(true);
+    onSelectionChange?.(commander);
     setOpen(false);
     setActive(-1);
   }
@@ -61,7 +61,7 @@ export function CommanderCombobox({ onSelectionChange }: { onSelectionChange?:(s
         const nextValue = event.target.value;
         setValue(nextValue);
         setSelectedId("");
-        onSelectionChange?.(false);
+        onSelectionChange?.(null);
         if (nextValue.trim().length < 2) { setResults([]); setOpen(false); setLoading(false); }
       }}
       onFocus={() => results.length && setOpen(true)}

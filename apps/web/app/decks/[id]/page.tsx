@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { DeleteDeckButton } from "@/components/delete-deck-button";
 import { RenameDeck } from "@/components/rename-deck";
+import { EditDeckDescription } from "@/components/edit-deck-description";
 import { DeckViewToggle } from "@/components/deck-view-toggle";
 import { CardArt } from "@/components/card-art";
 import { enrichCard } from "@/lib/mtg";
@@ -86,6 +87,9 @@ export default async function DeckPage({
   const deck = (await query<Deck>("SELECT * FROM decks WHERE id=$1", [id]))
     .rows[0];
   if (!deck) notFound();
+  const deckDescription = deck.description
+    ?.replace(/\s*Add OPENAI_API_KEY to enable assistant-built lists\.?$/, "")
+    .trim() || null;
   const cards = (
     await query<DeckCard>(
       `SELECT c.id card_id,c.name,c.set_code,c.mana_cost,c.mana_value,c.type_line,c.oracle_text,c.color_identity,c.commander_legal,c.image_url,dc.quantity,dc.section,c.price_usd_cents,least(dc.quantity,coalesce(o.qty,0))::int owned,greatest(dc.quantity-coalesce(o.qty,0),0)::int missing FROM deck_cards dc JOIN cards c ON c.id=dc.card_id LEFT JOIN (SELECT card_id,sum(quantity) qty FROM collection_items GROUP BY card_id) o ON o.card_id=c.id WHERE dc.deck_id=$1 ORDER BY CASE dc.section WHEN 'commander' THEN 0 WHEN 'mainboard' THEN 1 ELSE 2 END,c.type_line,c.name`,
@@ -209,10 +213,7 @@ export default async function DeckPage({
             {commander && (
               <strong className="commander-name">{commander.name}</strong>
             )}
-            <p>
-              {deck.description ??
-                "Build from your collection, then cost the cards still missing."}
-            </p>
+            <EditDeckDescription deckId={deck.id} currentDescription={deckDescription} />
             <DeleteDeckButton deckId={deck.id} deckName={deck.name} />
           </div>
         </div>

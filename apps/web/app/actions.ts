@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { findScryfallCard } from "@/lib/mtg";
 import { createCommanderDeck } from "@/lib/commander-builder";
+import { createConstructedDeck } from "@/lib/constructed-builder";
 
 const idSchema = z.string().min(1).max(200);
 
@@ -54,13 +55,23 @@ export async function addScryfallCardToLibrary(formData: FormData) {
   revalidatePath("/");
 }
 
-export async function updateCollectionQuantity(formData: FormData) {
-  const itemId = z.string().uuid().parse(formData.get("itemId"));
-  const quantity = z.coerce.number().int().min(0).max(999).parse(formData.get("quantity"));
-  if (quantity === 0) await query("DELETE FROM collection_items WHERE id=$1", [itemId]);
-  else await query("UPDATE collection_items SET quantity=$2, updated_at=now() WHERE id=$1", [itemId, quantity]);
-  revalidatePath("/library");
-  revalidatePath("/");
+export type UpdateCollectionQuantityState = { saved?: boolean; error?: string };
+
+export async function updateCollectionQuantity(_previousState: UpdateCollectionQuantityState, formData: FormData): Promise<UpdateCollectionQuantityState> {
+  const parsed = z.object({
+    itemId: z.string().uuid(),
+    quantity: z.coerce.number().int().min(0).max(999),
+  }).safeParse({ itemId: formData.get("itemId"), quantity: formData.get("quantity") });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a valid quantity." };
+  try {
+    if (parsed.data.quantity === 0) await query("DELETE FROM collection_items WHERE id=$1", [parsed.data.itemId]);
+    else await query("UPDATE collection_items SET quantity=$2, updated_at=now() WHERE id=$1", [parsed.data.itemId, parsed.data.quantity]);
+    revalidatePath("/library");
+    revalidatePath("/");
+    return { saved: true };
+  } catch {
+    return { error: "The collection could not be updated." };
+  }
 }
 
 export type CreateDeckState = { error?: string };
@@ -72,16 +83,24 @@ export async function createDeck(_previousState: CreateDeckState, formData: Form
     commanderName: z.string().trim().max(200).optional(),
     commanderId: z.string().uuid().optional(),
     budget: z.coerce.number().min(0).max(100000).optional(),
-    goals: z.string().trim().max(800).optional(),
-  }).safeParse({ name: formData.get("name"), format: formData.get("format") ?? "commander", commanderName: formData.get("commanderName") || undefined, commanderId:formData.get("commanderId")||undefined, budget: formData.get("budget") || undefined,goals:formData.get("goals")||undefined });
+    theme: z.string().trim().max(800).optional(),
+    colors: z.string().trim().max(20).optional(),
+    autoBuild: z.enum(["true", "false"]).default("false"),
+  }).safeParse({ name: formData.get("name"), format: formData.get("format") ?? "commander", commanderName: formData.get("commanderName") || undefined, commanderId:formData.get("commanderId")||undefined, budget: formData.get("budget") || undefined, theme:formData.get("theme")||undefined, colors:formData.get("colors")||undefined, autoBuild:formData.get("autoBuild")||"false" });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the deck details." };
-  const { name, format, commanderName, commanderId, budget, goals } = parsed.data;
+  const { name, format, commanderName, commanderId, budget, theme, colors: rawColors, autoBuild: autoBuildValue } = parsed.data;
+  const requestedColors = rawColors ? new Set(rawColors.split(",").filter(Boolean)) : new Set<string>();
+  const colors = ["W", "U", "B", "R", "G"].filter((color) => requestedColors.has(color));
+  if (colors.some(color => !["W", "U", "B", "R", "G"].includes(color))) return { error: "Choose valid deck colors." };
+  const autoBuild = autoBuildValue === "true";
   const budgetCents = budget == null ? null : Math.round(budget * 100);
   let deckId: string;
   try {
-    if (format === "commander") {
+    if (autoBuild && format === "commander") {
       if (!commanderName || !commanderId) return { error: "Select a commander from the autocomplete suggestions before creating the deck." };
-      deckId = await createCommanderDeck({ name, commanderName, commanderId, budgetCents,goals:goals??null });
+      deckId = await createCommanderDeck({ name, commanderName, commanderId, budgetCents,theme:theme??null,colors });
+    } else if (autoBuild && format !== "commander") {
+      deckId = await createConstructedDeck({ name, format, budgetCents, theme:theme??null, colors });
     } else {
       const result = await query<{ id: string }>("INSERT INTO decks (name,format,target_budget_cents) VALUES ($1,$2,$3) RETURNING id", [name, format, budgetCents]);
       deckId = result.rows[0].id;
@@ -143,6 +162,21 @@ export async function renameDeck(_previousState: RenameDeckState, formData: Form
   redirect(`/decks/${parsed.data.deckId}`);
 }
 
+export type UpdateDeckDescriptionState = { error?: string };
+
+export async function updateDeckDescription(_previousState: UpdateDeckDescriptionState, formData: FormData): Promise<UpdateDeckDescriptionState> {
+  const parsed = z.object({
+    deckId: z.string().uuid(),
+    description: z.string().trim().max(800, "Descriptions cannot exceed 800 characters."),
+  }).safeParse({ deckId: formData.get("deckId"), description: formData.get("description") ?? "" });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a valid description." };
+  const result = await query("UPDATE decks SET description=$2,updated_at=now() WHERE id=$1", [parsed.data.deckId, parsed.data.description || null]);
+  if (result.rowCount === 0) return { error: "Deck not found." };
+  revalidatePath(`/decks/${parsed.data.deckId}`);
+  revalidatePath("/decks");
+  redirect(`/decks/${parsed.data.deckId}`);
+}
+
 export async function markDeckCardOwned(formData: FormData) {
   const parsed = z.object({ deckId: z.string().uuid(), cardId: z.string().uuid() }).parse({
     deckId: formData.get("deckId"),
@@ -150,8 +184,9 @@ export async function markDeckCardOwned(formData: FormData) {
   });
   const result = await query<{ added: number }>(
     `WITH needed AS (
-       SELECT greatest(max(dc.quantity)-coalesce((SELECT sum(ci.quantity) FROM collection_items ci WHERE ci.card_id=$2),0),0)::int quantity
-       FROM deck_cards dc WHERE dc.deck_id=$1 AND dc.card_id=$2 AND dc.section IN ('commander','mainboard')
+       SELECT 1::int quantity
+       FROM (SELECT max(dc.quantity) required_quantity FROM deck_cards dc WHERE dc.deck_id=$1 AND dc.card_id=$2 AND dc.section IN ('commander','mainboard')) required
+       WHERE required_quantity > coalesce((SELECT sum(ci.quantity) FROM collection_items ci WHERE ci.card_id=$2),0)
      ), added AS (
        INSERT INTO collection_items (card_id,quantity,location)
        SELECT $2,quantity,'Added from deck' FROM needed WHERE quantity>0
