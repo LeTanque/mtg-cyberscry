@@ -5,6 +5,7 @@ import { Check, Palette, Plus, Sparkles, X } from "lucide-react";
 import { createDeck, type CreateDeckState } from "@/app/actions";
 import { CommanderCombobox, type Commander } from "@/components/commander-combobox";
 import { ManaCost } from "@/components/mana-cost";
+import { InputClearButton } from "@/components/input-clear-button";
 
 const initialState: CreateDeckState = {};
 const colorOptions = [
@@ -100,7 +101,7 @@ export function CreateDeckForm() {
     });
 
   return <form action={formAction} className="stack-form">
-    <label>Deck name<input name="name" value={deckName} onChange={event => setDeckName(event.target.value)} required minLength={2} placeholder="Midnight Wheels" /></label>
+    <label>Deck name<span className="clearable-field"><input name="name" value={deckName} onChange={event => setDeckName(event.target.value)} required minLength={2} placeholder="Midnight Wheels" />{deckName && <InputClearButton label="Clear deck name" onClear={() => setDeckName("")} />}</span></label>
     <label>Format<select name="format" value={format} onChange={event => changeFormat(event.target.value)} required><option value="commander">Commander</option><option value="standard">Standard</option><option value="modern">Modern</option><option value="pauper">Pauper</option><option value="legacy">Legacy</option><option value="vintage">Vintage</option><option value="casual">Casual</option></select></label>
     <input type="hidden" name="autoBuild" value={autoBuild ? "true" : "false"} />
     <input type="hidden" name="colors" value={selectedColors.join(",")} />
@@ -121,7 +122,7 @@ export function CreateDeckForm() {
         {commanderRequired && <div className="commander-prompt auto-build-commander"><span><Sparkles size={14} /> First decision</span><label>Commander name<CommanderCombobox onSelectionChange={selectCommander} /></label><p>Choose a Commander-legal leader before building.</p></div>}
         <div className="auto-build-section"><span className="auto-build-label"><Palette size={14} /> Color direction <small>{commanderRequired && !selectedCommander ? "Choose a commander first" : commanderRequired ? "Optional — leave blank for full identity" : "Optional — leave blank for any color"}</small></span><div className="auto-build-colors" role="group" aria-label="Preferred deck colors">{colorOptions.map(([color, label]) => { const allowed = availableColors.includes(color); const selected = selectedColors.includes(color); return <button type="button" key={color} className={selected ? "active" : ""} aria-label={allowed ? label : `${label} is outside the selected commander identity`} aria-pressed={selected} disabled={!allowed} title={allowed ? label : `${label} is outside the selected commander identity`} onClick={() => toggleColor(color)}><ManaCost cost={`{${color}}`} />{selected && <Check size={11} aria-hidden="true" />}</button>; })}</div></div>
         <div className="theme-suggestions"><span className="theme-suggestions-label">Common themes</span><div role="group" aria-label="Suggested deck themes">{visibleThemeSuggestions.map(({ label, prompt }) => <button type="button" key={label} title={prompt} aria-label={`Add ${label} theme`} onClick={() => addThemeSuggestion(prompt)}>{label}</button>)}</div></div>
-        <label>Deck theme <textarea name="theme" value={theme} onChange={(event) => setTheme(event.target.value)} maxLength={800} placeholder="Artifacts, big swings, and a resilient midrange plan…" /><small>Describe the strategy, mood, power level, or cards you want the agent to prioritize. This can be blank.</small></label>
+        <label>Deck theme <span className="clearable-field"><textarea name="theme" value={theme} onChange={(event) => setTheme(event.target.value)} maxLength={800} placeholder="Artifacts, big swings, and a resilient midrange plan…" />{theme && <InputClearButton label="Clear deck theme" onClear={() => setTheme("")} />}</span><small>Describe the strategy, mood, power level, or cards you want the agent to prioritize. This can be blank.</small></label>
         <div className="auto-build-modal-foot"><button type="button" className="button" onClick={() => { setAutoBuild(false); setBuildModalOpen(false); }}>Cancel</button><button type="submit" className="button primary" disabled={pending || !canSubmit || (commanderRequired && !selectedCommander)}><Sparkles size={15} />{pending ? "Building legal deck…" : "Build Deck"}</button></div>
       </div>
     </div>}

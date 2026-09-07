@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Search } from "lucide-react";
 import { ManaCost } from "@/components/mana-cost";
+import { InputClearButton } from "@/components/input-clear-button";
 
 export type Commander = {
   id: string;
@@ -53,10 +54,21 @@ export function CommanderCombobox({ onSelectionChange }: { onSelectionChange?:(s
     setActive(-1);
   }
 
+  function clear() {
+    setValue("");
+    setSelectedId("");
+    setResults([]);
+    setOpen(false);
+    setLoading(false);
+    setActive(-1);
+    onSelectionChange?.(null);
+  }
+
   return <div className="commander-combobox"><input type="hidden" name="commanderId" value={selectedId}/>
     <div className="commander-input"><Search size={15}/><input
       name="commanderName"
       value={value}
+      className={value ? "has-clear" : undefined}
       onChange={event => {
         const nextValue = event.target.value;
         setValue(nextValue);
@@ -81,7 +93,7 @@ export function CommanderCombobox({ onSelectionChange }: { onSelectionChange?:(s
       aria-activedescendant={active >= 0 ? `commander-option-${active}` : undefined}
       placeholder="Start typing a commander…"
       autoComplete="off"
-    />{loading && <LoaderCircle className="combobox-loader" size={15}/>}</div>
+    />{value && <InputClearButton label="Clear commander" onClear={clear}/>} {loading && <LoaderCircle className={`combobox-loader${value ? " has-clear" : ""}`} size={15}/>}</div>
     {open && <div className="commander-options" id="commander-options" role="listbox">
       {results.length ? results.map((commander, index) => <button
         type="button"

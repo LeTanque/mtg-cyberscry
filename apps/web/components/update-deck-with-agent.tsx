@@ -4,11 +4,13 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, Send, Sparkles, X } from "lucide-react";
 import { updateDeckWithAgent, type UpdateDeckWithAgentState } from "@/app/actions";
+import { InputClearButton } from "@/components/input-clear-button";
 
 const initialState: UpdateDeckWithAgentState = {};
 
 export function UpdateDeckWithAgent({ deckId, deckName }: { deckId: string; deckName: string }) {
   const [open, setOpen] = useState(false);
+  const [prompt, setPrompt] = useState("");
   const [state, formAction, pending] = useActionState(updateDeckWithAgent, initialState);
   const router = useRouter();
 
@@ -51,7 +53,7 @@ export function UpdateDeckWithAgent({ deckId, deckName }: { deckId: string; deck
               <input type="hidden" name="deckId" value={deckId} />
               <label htmlFor="agent-update-prompt">What should change?</label>
               <div className="update-agent-input">
-                <textarea id="agent-update-prompt" name="prompt" maxLength={800} placeholder="Add more removal, make it faster, shift toward tokens…" required disabled={pending} />
+                <span className="clearable-field"><textarea id="agent-update-prompt" name="prompt" value={prompt} onChange={event => setPrompt(event.target.value)} maxLength={800} placeholder="Add more removal, make it faster, shift toward tokens…" required disabled={pending} />{prompt && <InputClearButton label="Clear update request" onClear={() => setPrompt("")} />}</span>
                 <button type="submit" disabled={pending} aria-label="Send update request"><Send size={15} /></button>
               </div>
               {state.error && <span className="update-agent-error" aria-live="polite">Try another request or check agent availability.</span>}
