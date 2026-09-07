@@ -257,7 +257,6 @@ export async function addCardToDeck(formData: FormData) {
     );
   revalidatePath(`/decks/${deckId}`);
   revalidatePath("/decks");
-  redirect(`/decks/${deckId}`);
 }
 
 export async function removeCardFromDeck(formData: FormData) {
