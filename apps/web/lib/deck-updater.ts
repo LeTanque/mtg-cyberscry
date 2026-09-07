@@ -1,5 +1,5 @@
 import { pool, type PoolClient } from "@cyberscry/database";
-import { findScryfallCard, searchScryfall, type ScryfallCard } from "@/lib/mtg";
+import { enrichCard, findScryfallCard, searchScryfall, type ScryfallCard } from "@/lib/mtg";
 import { askDeckAssistant } from "@/lib/deck-assistant";
 import { saveCard } from "@/lib/commander-builder";
 
@@ -10,6 +10,7 @@ type DeckRow = {
   description: string | null;
   target_budget_cents: number | null;
   commander_external_id: string | null;
+  commander_name: string | null;
 };
 
 type CurrentCard = {
@@ -35,6 +36,20 @@ function formatQuery(format: string) {
 
 function identityQuery(colors: string[]) {
   return colors.length ? `id<=${colors.join("")}` : "id=c";
+}
+
+const scryfallIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function loadCommander(externalId: string | null, name: string | null) {
+  const scryfallId = externalId?.replace(/^scryfall:/, "");
+  if (scryfallId && scryfallIdPattern.test(scryfallId)) {
+    try {
+      return await findScryfallCard(scryfallId);
+    } catch {
+      // Fall through to the name lookup for cards whose catalog ID is stale.
+    }
+  }
+  return name ? (await enrichCard(name)) ?? undefined : undefined;
 }
 
 function dedupe(cards: ScryfallCard[]) {
@@ -197,7 +212,7 @@ async function insertCard(client: PoolClient, deckId: string, card: ScryfallCard
 
 export async function updateDeckWithAgent(deckId: string, prompt: string) {
   const deck = (await pool.query<DeckRow>(
-    `SELECT d.id,d.name,d.format,d.description,d.target_budget_cents,c.external_id commander_external_id
+    `SELECT d.id,d.name,d.format,d.description,d.target_budget_cents,c.external_id commander_external_id,c.name commander_name
      FROM decks d LEFT JOIN cards c ON c.id=d.commander_card_id WHERE d.id=$1`,
     [deckId],
   )).rows[0];
@@ -208,8 +223,8 @@ export async function updateDeckWithAgent(deckId: string, prompt: string) {
      FROM deck_cards dc JOIN cards c ON c.id=dc.card_id WHERE dc.deck_id=$1 ORDER BY dc.section,c.name`,
     [deckId],
   )).rows;
-  const commander = deck.format === "commander" && deck.commander_external_id
-    ? await findScryfallCard(deck.commander_external_id.replace(/^scryfall:/, ""))
+  const commander = deck.format === "commander"
+    ? await loadCommander(deck.commander_external_id, deck.commander_name)
     : undefined;
   if (deck.format === "commander" && (!commander || commander.legalities?.commander !== "legal")) {
     throw new Error("Choose a valid Commander before updating this deck.");
