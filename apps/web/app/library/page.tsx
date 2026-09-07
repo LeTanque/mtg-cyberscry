@@ -6,6 +6,7 @@ import { ManaCost } from "@/components/mana-cost";
 import { LibraryPrintingSearch } from "@/components/library-printing-search";
 import { CollectionFilterSearch } from "@/components/collection-filter-search";
 import { SaveCollectionQuantity } from "@/components/save-collection-quantity";
+import { HoverCardPreview } from "@/components/hover-card-preview";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
     <div className="split-layout"><section>
       <CollectionFilterSearch initialQuery={q} options={ownedOptions}/>
       <div className="toolbar"><span><SlidersHorizontal size={15}/> All owned cards</span><span>{money(library.reduce((sum,c)=>sum+c.collection_value,0))} shown value</span></div>
-      <div className="collection-grid">{library.map(card => <article className="collection-card" key={card.item_id}><CardArt src={card.image_url} name={card.name}/><div className="collection-info"><span className="set">{card.set_code} · {card.condition.replace("_"," ")}</span><h3>{card.name}</h3><p><ManaCost cost={card.mana_cost}/> {card.type_line}</p><div className="card-bottom"><strong>{money(card.price_usd_cents)}</strong><SaveCollectionQuantity itemId={card.item_id} quantity={card.quantity}/></div></div></article>)}</div>
+      <div className="collection-grid">{library.map(card => <article className="collection-card" key={card.item_id}><HoverCardPreview src={card.image_url} name={card.name}><CardArt src={card.image_url} name={card.name}/></HoverCardPreview><div className="collection-info"><span className="set">{card.set_code} · {card.condition.replace("_"," ")}</span><h3>{card.name}</h3><p><ManaCost cost={card.mana_cost}/> {card.type_line}</p><div className="card-bottom"><strong>{money(card.price_usd_cents)}</strong><SaveCollectionQuantity itemId={card.item_id} quantity={card.quantity}/></div></div></article>)}</div>
       {!library.length && <div className="empty"><LibraryIcon/><h3>No cards found</h3><p>Search the MTG catalog on the right to add your first printing.</p></div>}
     </section><aside className="catalog-panel"><span className="kicker">Scryfall catalog</span><h2>Find a printing</h2><p>Search current Scryfall printings, then add one to your collection.</p><LibraryPrintingSearch/></aside></div>
   </div>;
