@@ -5,7 +5,6 @@ import { Check, Palette, Plus, Sparkles, X } from "lucide-react";
 import { createDeck, type CreateDeckState } from "@/app/actions";
 import { CommanderCombobox, type Commander } from "@/components/commander-combobox";
 import { ManaCost } from "@/components/mana-cost";
-import { AgentStatus } from "@/components/agent-status";
 
 const initialState: CreateDeckState = {};
 const colorOptions = [
@@ -107,7 +106,7 @@ export function CreateDeckForm() {
     <input type="hidden" name="colors" value={selectedColors.join(",")} />
     <button type="button" className={autoBuild ? "auto-build-toggle active" : "auto-build-toggle"} role="switch" aria-checked={autoBuild} onClick={toggleAutoBuild}>
       <span className="auto-build-toggle-icon"><Sparkles size={14} /></span>
-      <span><strong>Auto Build <AgentStatus /></strong><small>{autoBuild ? "Agent-assisted build enabled" : "Start with an empty deck"}</small></span>
+      <span><strong>Auto Build</strong><small>{autoBuild ? "Agent-assisted build enabled" : "Start with an empty deck"}</small></span>
       <span className="toggle-track" aria-hidden="true"><i /></span>
     </button>
     <label>Target budget (USD)<input name="budget" type="number" min="0" step="1" placeholder="1000" /></label>

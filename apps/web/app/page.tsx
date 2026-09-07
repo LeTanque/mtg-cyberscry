@@ -28,7 +28,7 @@ export default async function Dashboard() {
     (SELECT coalesce(sum(quantity),0)::int FROM collection_items) total_cards,
     (SELECT coalesce(sum(ci.quantity*c.price_usd_cents),0)::int FROM collection_items ci JOIN cards c ON c.id=ci.card_id) collection_value,
     (SELECT count(*)::int FROM decks) deck_count,
-    (SELECT coalesce(sum(greatest(dc.quantity-coalesce(owned.qty,0),0)*coalesce(c.price_usd_cents,0)),0)::int FROM deck_cards dc JOIN cards c ON c.id=dc.card_id LEFT JOIN (SELECT card_id,sum(quantity) qty FROM collection_items GROUP BY card_id) owned ON owned.card_id=dc.card_id) missing_cost`)
+    (SELECT coalesce(sum(CASE WHEN c.type_line LIKE '%Basic%' AND c.type_line LIKE '%Land%' THEN 0 ELSE greatest(dc.quantity-coalesce(owned.qty,0),0)*coalesce(c.price_usd_cents,0) END),0)::int FROM deck_cards dc JOIN cards c ON c.id=dc.card_id LEFT JOIN (SELECT card_id,sum(quantity) qty FROM collection_items GROUP BY card_id) owned ON owned.card_id=dc.card_id) missing_cost`)
   ).rows[0];
   const decks = (
     await query<{
@@ -40,8 +40,8 @@ export default async function Dashboard() {
       missing_cost: number;
       preview_image: string | null;
     }>(`SELECT d.id,d.name,d.format,coalesce(sum(dc.quantity),0)::int cards,
-    coalesce(sum(greatest(dc.quantity-coalesce(o.qty,0),0)),0)::int missing,
-    coalesce(sum(greatest(dc.quantity-coalesce(o.qty,0),0)*coalesce(c.price_usd_cents,0)),0)::int missing_cost,
+    coalesce(sum(CASE WHEN c.type_line LIKE '%Basic%' AND c.type_line LIKE '%Land%' THEN 0 ELSE greatest(dc.quantity-coalesce(o.qty,0),0) END),0)::int missing,
+    coalesce(sum(CASE WHEN c.type_line LIKE '%Basic%' AND c.type_line LIKE '%Land%' THEN 0 ELSE greatest(dc.quantity-coalesce(o.qty,0),0)*coalesce(c.price_usd_cents,0) END),0)::int missing_cost,
     coalesce(nullif(cmd.image_url,''),(SELECT c2.image_url FROM deck_cards dc2 JOIN cards c2 ON c2.id=dc2.card_id WHERE dc2.deck_id=d.id AND c2.image_url IS NOT NULL AND c2.image_url<>'' ORDER BY CASE dc2.section WHEN 'commander' THEN 0 ELSE 1 END,c2.name LIMIT 1)) preview_image
     FROM decks d LEFT JOIN deck_cards dc ON dc.deck_id=d.id LEFT JOIN cards c ON c.id=dc.card_id LEFT JOIN cards cmd ON cmd.id=d.commander_card_id LEFT JOIN (SELECT card_id,sum(quantity) qty FROM collection_items GROUP BY card_id) o ON o.card_id=dc.card_id GROUP BY d.id,cmd.image_url ORDER BY d.updated_at DESC LIMIT 4`)
   ).rows;

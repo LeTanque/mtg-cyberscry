@@ -16,6 +16,8 @@ import {
 import { DeleteDeckButton } from "@/components/delete-deck-button";
 import { RenameDeck } from "@/components/rename-deck";
 import { EditDeckDescription } from "@/components/edit-deck-description";
+import { UpdateDeckWithAgent } from "@/components/update-deck-with-agent";
+import { DeckCardQuantity } from "@/components/deck-card-quantity";
 import { DeckViewToggle } from "@/components/deck-view-toggle";
 import { CardArt } from "@/components/card-art";
 import { enrichCard } from "@/lib/mtg";
@@ -24,6 +26,7 @@ import { ManaCost } from "@/components/mana-cost";
 import { DeckCardSearch } from "@/components/deck-card-search";
 import { DeckLegalitySummary } from "@/components/deck-legality-summary";
 import { validateCommanderDeck } from "@/lib/deck-legality";
+import { deckCardQuantityLimit } from "@/lib/deck-quantity";
 
 export const dynamic = "force-dynamic";
 
@@ -92,7 +95,7 @@ export default async function DeckPage({
     .trim() || null;
   const cards = (
     await query<DeckCard>(
-      `SELECT c.id card_id,c.name,c.set_code,c.mana_cost,c.mana_value,c.type_line,c.oracle_text,c.color_identity,c.commander_legal,c.image_url,dc.quantity,dc.section,c.price_usd_cents,least(dc.quantity,coalesce(o.qty,0))::int owned,greatest(dc.quantity-coalesce(o.qty,0),0)::int missing FROM deck_cards dc JOIN cards c ON c.id=dc.card_id LEFT JOIN (SELECT card_id,sum(quantity) qty FROM collection_items GROUP BY card_id) o ON o.card_id=c.id WHERE dc.deck_id=$1 ORDER BY CASE dc.section WHEN 'commander' THEN 0 WHEN 'mainboard' THEN 1 ELSE 2 END,c.type_line,c.name`,
+      `SELECT c.id card_id,c.name,c.set_code,c.mana_cost,c.mana_value,c.type_line,c.oracle_text,c.color_identity,c.commander_legal,c.image_url,dc.quantity,dc.section,c.price_usd_cents,CASE WHEN c.type_line LIKE '%Basic%' AND c.type_line LIKE '%Land%' THEN dc.quantity ELSE least(dc.quantity,coalesce(o.qty,0)) END::int owned,CASE WHEN c.type_line LIKE '%Basic%' AND c.type_line LIKE '%Land%' THEN 0 ELSE greatest(dc.quantity-coalesce(o.qty,0),0) END::int missing FROM deck_cards dc JOIN cards c ON c.id=dc.card_id LEFT JOIN (SELECT card_id,sum(quantity) qty FROM collection_items GROUP BY card_id) o ON o.card_id=c.id WHERE dc.deck_id=$1 ORDER BY CASE dc.section WHEN 'commander' THEN 0 WHEN 'mainboard' THEN 1 ELSE 2 END,c.type_line,c.name`,
       [id],
     )
   ).rows;
@@ -180,6 +183,7 @@ export default async function DeckPage({
         card.name.toLowerCase().includes(cardQuery.toLowerCase()),
       )
     : sortedCards;
+  const noMatchingCards = filteredCards.length === 0;
   const groups = Object.groupBy(filteredCards, (card) => card.section);
   const commander = displayCards.find((card) => card.section === "commander");
   const legality =
@@ -214,6 +218,7 @@ export default async function DeckPage({
               <strong className="commander-name">{commander.name}</strong>
             )}
             <EditDeckDescription deckId={deck.id} currentDescription={deckDescription} />
+            <UpdateDeckWithAgent deckId={deck.id} deckName={deck.name} />
             <DeleteDeckButton deckId={deck.id} deckName={deck.name} />
           </div>
         </div>
@@ -247,9 +252,9 @@ export default async function DeckPage({
             cardOptions={[...new Set(cards.map((card) => card.name))].sort(
               (a, b) => a.localeCompare(b),
             )}
-            listView={<DeckList groups={groups} deckId={id} filter={filter} />}
+            listView={noMatchingCards ? <EmptyDeckResults query={cardQuery} /> : <DeckList groups={groups} deckId={id} filter={filter} format={deck.format} />}
             cardView={
-              <DeckGallery groups={groups} deckId={id} filter={filter} />
+              noMatchingCards ? <EmptyDeckResults query={cardQuery} /> : <DeckGallery groups={groups} deckId={id} filter={filter} format={deck.format} />
             }
           />
         </section>
@@ -290,7 +295,7 @@ export default async function DeckPage({
               ))}
             </div>
           </div>
-          <DeckLegalitySummary status={legality} />
+          <DeckLegalitySummary status={legality} format={deck.format} />
         </aside>
       </div>
       <section className="purchase-summary">
@@ -307,6 +312,15 @@ export default async function DeckPage({
           </p>
         </div>
       </section>
+    </div>
+  );
+}
+
+function EmptyDeckResults({ query }: { query: string }) {
+  return (
+    <div className="empty deck-search-empty">
+      <h3>{query ? "No cards found" : "This deck is empty"}</h3>
+      <p>{query ? `No cards in this deck match “${query}”. Clear the search to see the full deck.` : "Add cards from your library or use the card search to start building it."}</p>
     </div>
   );
 }
@@ -337,10 +351,12 @@ function DeckList({
   groups,
   deckId,
   filter,
+  format,
 }: {
   groups: Partial<Record<string, DeckCard[]>>;
   deckId: string;
   filter: string;
+  format: string;
 }) {
   const mainboard = groups.mainboard ?? [];
   const visibleCategories =
@@ -354,14 +370,16 @@ function DeckList({
           title="Commander"
           cards={groups.commander ?? []}
           deckId={deckId}
+          format={format}
         />
       )}
       {visibleCategories.map(([title, matches]) =>
         title === "Lands" ? (
-          <LandListSections
+            <LandListSections
             key={title}
             cards={mainboard.filter(matches)}
             deckId={deckId}
+            format={format}
           />
         ) : (
           <ListSection
@@ -369,6 +387,7 @@ function DeckList({
             title={title}
             cards={mainboard.filter(matches)}
             deckId={deckId}
+            format={format}
           />
         ),
       )}
@@ -377,6 +396,7 @@ function DeckList({
           title="Maybeboard"
           cards={groups.maybeboard ?? []}
           deckId={deckId}
+          format={format}
         />
       )}
     </>
@@ -386,9 +406,11 @@ function DeckList({
 function LandListSections({
   cards,
   deckId,
+  format,
 }: {
   cards: DeckCard[];
   deckId: string;
+  format: string;
 }) {
   if (!cards.length) return null;
   return (
@@ -400,11 +422,13 @@ function LandListSections({
         title="Basic lands"
         cards={cards.filter(isBasicLand)}
         deckId={deckId}
+        format={format}
       />
       <ListSection
         title="Other lands"
         cards={cards.filter((card) => !isBasicLand(card))}
         deckId={deckId}
+        format={format}
       />
     </div>
   );
@@ -414,10 +438,12 @@ function ListSection({
   title,
   cards,
   deckId,
+  format,
 }: {
   title: string;
   cards: DeckCard[];
   deckId: string;
+  format: string;
 }) {
   if (!cards.length) return null;
   return (
@@ -431,7 +457,6 @@ function ListSection({
           className="deck-card-line"
           key={`${card.card_id}-${card.section}`}
         >
-          <span className="qty">{card.quantity}×</span>
           <div>
             <HoverCardPreview src={card.image_url} name={card.name}>
               <strong>{card.name}</strong>
@@ -441,7 +466,17 @@ function ListSection({
               <span aria-hidden="true">·</span> {card.type_line}
             </small>
           </div>
-          <Ownership card={card} deckId={deckId} />
+          <div className="deck-card-controls">
+            <Ownership card={card} deckId={deckId} />
+            <DeckCardQuantity
+              deckId={deckId}
+              cardId={card.card_id}
+              section={card.section}
+              cardName={card.name}
+              quantity={card.quantity}
+              maxQuantity={deckCardQuantityLimit({ format, section: card.section, typeLine: card.type_line, oracleText: card.oracle_text })}
+            />
+          </div>
           <strong>
             {card.missing
               ? money(card.missing * (card.price_usd_cents ?? 0))
@@ -465,10 +500,12 @@ function DeckGallery({
   groups,
   deckId,
   filter,
+  format,
 }: {
   groups: Partial<Record<string, DeckCard[]>>;
   deckId: string;
   filter: string;
+  format: string;
 }) {
   const mainboard = groups.mainboard ?? [];
   const visibleCategories =
@@ -482,6 +519,7 @@ function DeckGallery({
           title="Commander"
           cards={groups.commander ?? []}
           deckId={deckId}
+          format={format}
         />
       )}
       {visibleCategories.map(([title, matches]) =>
@@ -490,6 +528,7 @@ function DeckGallery({
             key={title}
             cards={mainboard.filter(matches)}
             deckId={deckId}
+            format={format}
           />
         ) : (
           <GallerySection
@@ -497,6 +536,7 @@ function DeckGallery({
             title={title}
             cards={mainboard.filter(matches)}
             deckId={deckId}
+            format={format}
           />
         ),
       )}
@@ -505,6 +545,7 @@ function DeckGallery({
           title="Maybeboard"
           cards={groups.maybeboard ?? []}
           deckId={deckId}
+          format={format}
         />
       )}
     </>
@@ -514,9 +555,11 @@ function DeckGallery({
 function LandGallerySections({
   cards,
   deckId,
+  format,
 }: {
   cards: DeckCard[];
   deckId: string;
+  format: string;
 }) {
   if (!cards.length) return null;
   return (
@@ -528,11 +571,13 @@ function LandGallerySections({
         title="Basic lands"
         cards={cards.filter(isBasicLand)}
         deckId={deckId}
+        format={format}
       />
       <GallerySection
         title="Other lands"
         cards={cards.filter((card) => !isBasicLand(card))}
         deckId={deckId}
+        format={format}
       />
     </div>
   );
@@ -546,10 +591,12 @@ function GallerySection({
   title,
   cards,
   deckId,
+  format,
 }: {
   title: string;
   cards: DeckCard[];
   deckId: string;
+  format: string;
 }) {
   if (!cards.length) return null;
   return (
@@ -574,6 +621,15 @@ function GallerySection({
                 {card.set_code} <span aria-hidden="true">·</span>{" "}
                 <ManaCost cost={card.mana_cost} />
               </small>
+              <DeckCardQuantity
+                deckId={deckId}
+                cardId={card.card_id}
+                section={card.section}
+                cardName={card.name}
+                quantity={card.quantity}
+                maxQuantity={deckCardQuantityLimit({ format, section: card.section, typeLine: card.type_line, oracleText: card.oracle_text })}
+                compact
+              />
               <Ownership card={card} deckId={deckId} />
               {card.missing > 0 && (
                 <em>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Boxes, Crown, Layers3, LibraryBig, Sparkles } from "lucide-react";
+import { AgentStatus } from "@/components/agent-status";
 
 const links = [
   ["Overview", "/", Boxes],
@@ -12,6 +13,6 @@ export function Nav() {
   return <header className="topbar">
     <Link className="brand" href="/"><span className="brandmark"><Sparkles size={17}/></span><span>CYBERSCRY</span></Link>
     <nav>{links.map(([label, href, Icon]) => <Link key={href} href={href}><Icon size={16}/>{label}</Link>)}</nav>
-    <div className="status"><i/>Collection online</div>
+    <div className="status"><span className="collection-status"><i/>Collection online</span><AgentStatus /></div>
   </header>;
 }
