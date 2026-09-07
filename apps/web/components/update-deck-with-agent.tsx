@@ -30,7 +30,7 @@ export function UpdateDeckWithAgent({ deckId, deckName }: { deckId: string; deck
   return (
     <>
       <button className="update-agent-trigger" type="button" onClick={() => setOpen(true)}>
-        <Sparkles size={13} /> Update with Agent
+        <Sparkles size={13} /> Intelligent Update
       </button>
       {open && (
         <div className="update-agent-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) setOpen(false); }}>
